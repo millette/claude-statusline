@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Usage: statusline.sh [full|compact]   full = 3 lines next to Clawd (default), compact = 1 line
 layout=${1:-full}
+# jaq is a faster drop-in for jq: use it when installed
+JQ=$(command -v jaq || command -v jq || true)
 input=$(cat)
 now=$(date +%s)
 
@@ -14,7 +16,7 @@ SEP=" ${DIM}│${RESET} "
 
 # cwd comes last: read puts the rest of the line (any '|' included) in the final variable.
 # Strings are stripped of '|' and control characters so they can't shift fields or drive the terminal.
-IFS='|' read -r ctx size used effort h5 h5r d7 d7r model cwd < <(jq -r '
+IFS='|' read -r ctx size used effort h5 h5r d7 d7r model cwd < <("$JQ" -r '
   def clean: tostring | gsub("[|[:cntrl:]]"; "");
   (.context_window // {}) as $c
   | ($c.current_usage // {}) as $u
@@ -85,7 +87,7 @@ fi
 
 # ── Effort: session JSON, else env var, else settings.json
 if [ -z "$effort" ]; then
-  effort=${CLAUDE_CODE_EFFORT_LEVEL:-$(jq -r '.effortLevel // empty' \
+  effort=${CLAUDE_CODE_EFFORT_LEVEL:-$("$JQ" -r '.effortLevel // empty' \
     "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" 2>/dev/null)}
 fi
 case "$effort" in

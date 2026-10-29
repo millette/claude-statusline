@@ -71,7 +71,7 @@ main() {
   fi
 
   # ── Layout: STATUSLINE_LAYOUT, else ask with a preview, else keep the current one
-  current=$("$JQ" -r '.statusLine.command // "" | split(" ")[1] // ""' "$SETTINGS" 2>/dev/null || true)
+  current=$("$JQ" -r '.statusLine.command // "" | split(" ")[-1] // ""' "$SETTINGS" 2>/dev/null || true)
   case "$current" in full|compact) ;; *) current="" ;; esac  # another status line, or an older install
   layout=${STATUSLINE_LAYOUT:-}
   if [ -z "$layout" ]; then
@@ -81,12 +81,20 @@ main() {
   ok "layout: $layout"
 
   if [ -s "$SETTINGS" ]; then
-    cp "$SETTINGS" "$SETTINGS.bak"
-    ok "backup: $SETTINGS.bak"
+    # Only the first backup is kept: later runs would overwrite the original with an already-modified file
+    if [ -e "$SETTINGS.bak" ]; then
+      ok "backup kept: $SETTINGS.bak (from an earlier install)"
+    else
+      cp "$SETTINGS" "$SETTINGS.bak"
+      ok "backup: $SETTINGS.bak"
+    fi
   else
     echo '{}' > "$SETTINGS"
   fi
-  "$JQ" --arg cmd "$SCRIPT $layout" '.statusLine = {type: "command", command: $cmd}' "$SETTINGS" > "$tmp"
+  # Single-quoted so a path with spaces or shell characters survives the shell that runs the command
+  sq="'"
+  cmd="'${SCRIPT//$sq/$sq\\$sq$sq}' $layout"
+  "$JQ" --arg cmd "$cmd" '.statusLine = {type: "command", command: $cmd}' "$SETTINGS" > "$tmp"
   cat "$tmp" > "$SETTINGS"  # rewrite in place: keeps file permissions
   ok "statusLine configured in $SETTINGS"
 
